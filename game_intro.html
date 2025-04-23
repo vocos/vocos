@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>블록 어드벤처 - 게임 소개</title>
+    <!-- Phaser CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 픽셀 스타일 폰트 (Press Start 2P) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Press Start 2P', cursive;
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+            /* --- 배경 이미지 설정 --- */
+            background-image: url('./images/story.jpg'); /* 이미지 경로 지정 */
+            background-size: cover; /* 화면 전체를 덮도록 크기 조절 */
+            background-position: center center; /* 이미지를 중앙에 위치 */
+            background-repeat: no-repeat; /* 이미지 반복 없음 */
+            background-attachment: fixed; /* 스크롤 시 배경 고정 (선택 사항) */
+            /* --- 배경 이미지 설정 끝 --- */
+        }
+        .pixel-button {
+            background-color: #A0A0A0;
+            color: #333333;
+            padding: 0.75rem 1.5rem;
+            border: 4px solid #505050;
+            box-shadow: 4px 4px 0px #505050;
+            transition: all 0.1s ease-out;
+            text-transform: uppercase;
+            cursor: pointer;
+        }
+        .pixel-button:hover {
+            background-color: #808080;
+            box-shadow: 2px 2px 0px #505050;
+            transform: translate(2px, 2px);
+        }
+        .pixel-button:active {
+            box-shadow: none;
+            transform: translate(4px, 4px);
+        }
+        .pixel-border {
+             border: 4px solid #6B4423;
+             border-image-slice: 2;
+             border-image-width: 2;
+             border-image-repeat: stretch;
+             border-image-source: url('data:image/svg+xml;utf8,<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="6" height="6"><g fill="%236B4423"><path d="M0,0 v2 h2 v-2 z M2,2 v2 h2 v-2 z M4,4 v2 h2 v-2 z M0,4 v2 h2 v-2 z M4,0 v2 h2 v-2 z"/></g></svg>');
+             background-clip: padding-box;
+             background-color: rgba(112, 128, 144, 0.85); /* SlateGray with opacity */
+        }
+        #story-modal { transition: opacity 0.3s ease-in-out; }
+        #story-modal .modal-content { transition: all 0.3s ease-in-out; }
+        #story-modal:not(.hidden) { opacity: 1; }
+        #story-modal:not(.hidden) .modal-content { transform: scale(1); opacity: 1; }
+        #story-modal.hidden { opacity: 0; pointer-events: none; }
+        #story-modal.hidden .modal-content { transform: scale(0.95); opacity: 0; }
+        .modal-open { overflow: hidden; }
+    </style>
+</head>
+<body class="text-white min-h-screen flex flex-col items-center justify-center p-4">
+
+    <!-- 메인 컨텐츠 컨테이너 (ID 추가) -->
+    <div id="intro-content" class="pixel-border p-8 md:p-12 text-center max-w-2xl">
+        <!-- ... 기존 h1, p, button 내용 ... -->
+        <h1 class="text-4xl md:text-5xl mb-6 text-white" style="text-shadow: 2px 2px #505050;">블록 어드벤처</h1>
+        <p class="text-base md:text-lg mb-8 leading-relaxed" style="text-shadow: 1px 1px #444;">
+            네모난 블록 세상을 탐험하고<br>
+            희귀한 광물을 찾아<br>
+            나만의 세계를 건설하세요!
+        </p>
+        <button id="start-button" class="pixel-button">
+            시작하기!
+        </button>
+    </div>
+
+    <!-- 게임 캔버스가 들어갈 컨테이너 (초기에는 숨김) -->
+    <div id="game-container" class="hidden w-full max-w-3xl aspect-video mt-8 pixel-border">
+        <!-- Phaser 캔버스가 여기에 삽입됩니다 -->
+    </div>
+
+    <!-- 저작권 표시 -->
+    <footer id="footer-content" class="mt-8 text-sm text-gray-200" style="text-shadow: 1px 1px #333;">
+        © 2024 Block Adventure Crafters
+    </footer>
+
+    <!-- 스토리 이미지 팝업(모달) 구조 (이전과 동일) -->
+    <div id="story-modal" class="hidden ...">
+        <!-- ... 모달 내용 ... -->
+    </div>
+
+    <script>
+        // ... 기존 모달 관련 JavaScript ...
+        document.addEventListener('DOMContentLoaded', () => {
+            const startButton = document.getElementById('start-button');
+            const storyModal = document.getElementById('story-modal');
+            // ... (모달 관련 변수 및 함수 정의는 그대로 둠) ...
+            const introContent = document.getElementById('intro-content');
+            const gameContainer = document.getElementById('game-container');
+            const footerContent = document.getElementById('footer-content');
+            let gameInstance = null; // Phaser 게임 인스턴스 저장 변수
+
+            // --- Phaser 게임 씬 정의 ---
+            class GameScene extends Phaser.Scene {
+                constructor() {
+                    super({ key: 'GameScene' });
+                    this.player = null;
+                    this.platforms = null;
+                    this.cursors = null;
+                }
+
+                preload() {
+                    // 간단한 플레이어와 땅 이미지를 동적으로 생성 (실제 게임에서는 이미지 파일 로드)
+                    // this.load.image('player', 'images/player.png');
+                    // this.load.image('ground', 'images/platform.png');
+
+                    // 임시 에셋 생성
+                    this.textures.addCanvas('player-temp', this.createTexture(32, 48, '#00ff00')); // 초록색 플레이어
+                    this.textures.addCanvas('ground-temp', this.createTexture(400, 32, '#8B4513')); // 갈색 땅
+                }
+
+                create() {
+                    // 배경색 설정 (선택 사항)
+                    this.cameras.main.setBackgroundColor('#87CEEB'); // 하늘색
+
+                    // 땅(플랫폼) 생성 - Static Group 사용
+                    this.platforms = this.physics.add.staticGroup();
+                    // 화면 하단에 땅 배치 (게임 월드 크기에 맞춰 중앙 정렬 및 스케일 조정)
+                    const ground = this.platforms.create(400, 584, 'ground-temp'); // y 좌표는 (캔버스 높이 - 땅 높이/2)
+                    ground.setScale(2, 1).refreshBody(); // 가로로 2배 늘리고 물리 상태 업데이트
+
+                    // 플레이어 생성
+                    this.player = this.physics.add.sprite(100, 450, 'player-temp');
+                    this.player.setBounce(0.1); // 약간의 탄성
+                    this.player.setCollideWorldBounds(true); // 화면 밖으로 나가지 않도록 설정
+
+                    // 물리 설정: 플레이어와 땅 충돌 설정
+                    this.physics.add.collider(this.player, this.platforms);
+
+                    // 입력 설정: 키보드 커서 키 사용
+                    this.cursors = this.input.keyboard.createCursorKeys();
+                }
+
+                update() {
+                    if (!this.cursors || !this.player) return; // 객체가 없으면 실행 중지
+
+                    // 좌우 이동
+                    if (this.cursors.left.isDown) {
+                        this.player.setVelocityX(-160);
+                        // 필요 시 플레이어 방향 전환 애니메이션 추가
+                    } else if (this.cursors.right.isDown) {
+                        this.player.setVelocityX(160);
+                        // 필요 시 플레이어 방향 전환 애니메이션 추가
+                    } else {
+                        this.player.setVelocityX(0);
+                        // 필요 시 정지 애니메이션 추가
+                    }
+
+                    // 점프 (땅에 닿아 있을 때만 가능)
+                    if (this.cursors.up.isDown && this.player.body.touching.down) {
+                        this.player.setVelocityY(-250); // 점프 높이 조절
+                    }
+                }
+
+                // 임시 텍스처 생성 헬퍼 함수
+                createTexture(width, height, color) {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = color;
+                    ctx.fillRect(0, 0, width, height);
+                    return canvas;
+                }
+            }
+
+            // --- Phaser 게임 설정 ---
+            const config = {
+                type: Phaser.AUTO, // WebGL 우선 사용, 불가능하면 Canvas 사용
+                width: 800,        // 게임 화면 너비
+                height: 600,       // 게임 화면 높이
+                parent: 'game-container', // 게임 캔버스를 넣을 div의 ID
+                physics: {
+                    default: 'arcade', // 아케이드 물리 엔진 사용
+                    arcade: {
+                        gravity: { y: 300 }, // 중력 설정
+                        debug: false // 물리 영역 표시 여부 (개발 시 true로 설정하면 유용)
+                    }
+                },
+                scene: [GameScene] // 사용할 씬 등록
+            };
+
+            // --- 시작 버튼 클릭 이벤트 ---
+            startButton.addEventListener('click', () => {
+                // 스토리 모달 열기 (기존 기능 유지)
+                // openStoryModal(); // 스토리 모달을 먼저 보여줄 경우 주석 해제
+
+                // 게임 시작 로직 (한 번만 실행되도록)
+                if (!gameInstance) {
+                    introContent.classList.add('hidden'); // 소개 내용 숨기기
+                    footerContent.classList.add('hidden'); // 푸터 숨기기 (선택 사항)
+                    gameContainer.classList.remove('hidden'); // 게임 컨테이너 보이기
+
+                    // Phaser 게임 인스턴스 생성
+                    gameInstance = new Phaser.Game(config);
+                }
+            });
+
+            // --- 기존 모달 관련 이벤트 리스너들 ---
+            // (closeStoryModalButton, storyModal, document keydown 리스너는 그대로 둠)
+            closeStoryModalButton.addEventListener('click', closeStoryModal);
+            storyModal.addEventListener('click', (event) => { /* ... */ });
+            document.addEventListener('keydown', (event) => { /* ... */ });
+        });
+    </script>
+
+</body>
+</html>
